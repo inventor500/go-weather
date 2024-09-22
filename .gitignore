@@ -1,0 +1,7 @@
+# Ignore the program binary
+cmd/weather/weather
+
+# Editor stuff
+*~
+.\#*
+\#*
