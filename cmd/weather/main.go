@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,37 +9,33 @@ import (
 )
 
 type Args struct {
-	Zip string
+	UserAgent string
+	Zip       string
 }
 
-var args Args
+var args *Args
+var printer = CreatePrinter()
 
 func init() {
 	slog.SetLogLoggerLevel(slog.LevelInfo)
-	if len(os.Args) != 2 { // TODO: More involved arguments, including °C/F, the user agent, etc
-		fmt.Fprintf(os.Stderr, "Useage: %s <zip>\n", os.Args[0])
-		os.Exit(1)
-	}
-	args.Zip = os.Args[0]
+	args = ParseArgs()
 }
 
 func main() {
-	os.Exit(mainFunc())
+	os.Exit(mainFunc(printer))
 }
 
-func mainFunc() int {
-	// TODO: Don't hard-code this
-	const userAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
+func mainFunc(printer Printer) int {
 	client := http.Client{}
-	res, err := weather.GetCity(args.Zip, userAgent, &client)
+	res, err := weather.GetCity(args.Zip, args.UserAgent, &client)
 	if err != nil {
 		return 1
 	}
-	latlong, err := weather.GetLatLong(res, userAgent, &client)
+	latlong, err := weather.GetLatLong(res, args.UserAgent, &client)
 	if err != nil {
 		return 1
 	}
-	doc, err := weather.GetWeather(latlong, userAgent, &client)
+	doc, err := weather.GetWeather(latlong, args.UserAgent, &client)
 	if err != nil {
 		return 1
 	}
@@ -48,10 +43,14 @@ func mainFunc() int {
 	if err != nil || w == nil {
 		return 1
 	}
-	// TODO: Format better, use bold when this is going to a terminal
-	fmt.Println("Upcoming Weather Events\n-----------------------")
+	printer.Printf(Underline|Bold, "Weather Advisories\n")
+	for i := 0; i < len(w.Advisories); i++ {
+		printer.Printf(Red, "%s\n", w.Advisories[i].Description)
+	}
+	printer.Printf(Underline|Bold, "Upcoming Weather Events\n")
 	for i := 0; i < len(w.WeatherTimes); i++ {
-		fmt.Println(w.WeatherTimes[i])
+		printer.Printf(Bold, "%s ", w.WeatherTimes[i].Label)
+		printer.Printf(Regular, "%s\n", w.WeatherTimes[i].LongDesc)
 	}
 	return 0
 }

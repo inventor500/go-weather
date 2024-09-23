@@ -153,6 +153,7 @@ func ParseWeather(doc *goquery.Document) (*Weather, error) {
 		return nil, ErrInvalidParameter
 	}
 	var weather Weather
+	// Without .forecast-tombstone, this only finds one element
 	shortForecast := doc.Find("#seven-day-forecast-list .forecast-tombstone")
 	weather.WeatherTimes = make([]WeatherTime, shortForecast.Length())
 	// Get the short descriptions
@@ -168,7 +169,11 @@ func ParseWeather(doc *goquery.Document) (*Weather, error) {
 		if i < len(weather.WeatherTimes) {
 			weather.WeatherTimes[i].LongDesc = s.Text()
 		}
-		// TODO: Get advisories
+	})
+	advisories := doc.Find(".panel-danger .panel-body ul li")
+	weather.Advisories = make([]Advisory, advisories.Length())
+	advisories.Each(func(i int, s *goquery.Selection) {
+		weather.Advisories[i].Description = s.Text() // TODO: Needs for information than this
 	})
 	return &weather, nil
 }

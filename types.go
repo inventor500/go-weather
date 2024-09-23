@@ -45,7 +45,6 @@ type Weather struct {
 
 type Advisory struct {
 	Description string
-	Time        string
 }
 
 type WeatherTime struct {
@@ -53,6 +52,7 @@ type WeatherTime struct {
 	Temp      string // TODO: This should by a float, and keep track of °C/F
 	ShortDesc string
 	LongDesc  string
+	// TODO: Air quality?
 }
 
 func (w WeatherTime) String() string {
