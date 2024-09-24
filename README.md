@@ -18,7 +18,9 @@ Example: `weather 53226`
 
 ### Configuration File
 The configuration file is located at `$XDG_CONFIG_HOME/weather/config.json` by default.
+
 | *Key*              | *Description*                 |
+|--------------------|-------------------------------|
 | `default-location` | Default location to query for |
 | `user-agent`       | User agent to use for queries |
 
