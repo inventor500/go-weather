@@ -10,7 +10,7 @@ import (
 
 type Args struct {
 	UserAgent string
-	Zip       string
+	Location  string
 }
 
 var args *Args
@@ -18,7 +18,11 @@ var printer = CreatePrinter()
 
 func init() {
 	slog.SetLogLoggerLevel(slog.LevelInfo)
-	args = ParseArgs()
+	var err error
+	args, err = ParseArgs()
+	if err != nil {
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -27,7 +31,7 @@ func main() {
 
 func mainFunc(printer Printer) int {
 	client := http.Client{}
-	res, err := weather.GetCity(args.Zip, args.UserAgent, &client)
+	res, err := weather.GetCity(args.Location, args.UserAgent, &client)
 	if err != nil {
 		return 1
 	}

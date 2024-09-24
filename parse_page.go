@@ -37,7 +37,7 @@ func addHeaders(req *http.Request, userAgent string, isScript bool) {
 	}
 }
 
-func GetCity(zip string, userAgent string, client *http.Client) (string, error) {
+func GetCity(location string, userAgent string, client *http.Client) (string, error) {
 	if client == nil {
 		client = &http.Client{}
 	}
@@ -46,7 +46,7 @@ func GetCity(zip string, userAgent string, client *http.Client) (string, error) 
 	params.Add("f", "json")
 	params.Add("maxSuggestions", "1")
 
-	params.Add("text", zip)
+	params.Add("text", location)
 	params.Add("countryCode", "USA,PRI,VIR,GUM,ASM")
 	params.Add("category", "Land Features,Bay,Channel,Cove,Dam,Delta,Gulf,Lagoon,Lake,Ocean,Reef,Reservoir,Sea,Sound,Strait,Waterfall,Wharf,Amusement Park,Historical Monument,Landmark,Tourist Attraction,Zoo,College,Beach,Campground,Golf Course,Harbor,Nature Reserve,Other Parks and Outdoors,Park,Racetrack,Scenic Overlook,Ski Resort,Sports Center,Sports Field,Wildlife Reserve,Airport,Ferry,Marina,Pier,Port,Resort,Postal,Populated Place")
 	urlToSend.RawQuery = params.Encode()
@@ -54,24 +54,24 @@ func GetCity(zip string, userAgent string, client *http.Client) (string, error) 
 	addHeaders(req, userAgent, true)
 	res, err := client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request for city lookup", "error", err)
+		slog.Error("Error sending request for city lookup", "error", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	defer res.Body.Close()
 	response, err := io.ReadAll(res.Body)
 	if err != nil {
-		slog.Error("Failed to read results of city lookup", "error", err)
+		slog.Error("Failed to read results of city lookup", "error", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	slog.Debug("Received response", "response", response)
 	var results SearchSuggestions
 	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Error decoding response of city lookup", "error", err)
+		slog.Error("Error decoding response of city lookup", "error", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	slog.Debug("Received results from geocode.arcgis.com", "results", results)
 	if len(results.Suggestions) != 1 {
-		slog.Error("Received an invalid number of results when fetching city name", "zip", zip, "numResults", len(results.Suggestions))
+		slog.Error("Received an invalid number of results when fetching city name", "zip", location, "numResults", len(results.Suggestions))
 		return "", ErrInvalidCityResult
 	}
 	return results.Suggestions[0].Result, nil
@@ -92,19 +92,19 @@ func GetLatLong(city, userAgent string, client *http.Client) (*LatLong, error) {
 	addHeaders(req, userAgent, true)
 	res, err := client.Do(req)
 	if err != nil {
-		slog.Error("Failed to get Lat/Long values", "error", err)
+		slog.Error("Failed to get Lat/Long values", "error", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	defer res.Body.Close()
 	response, err := io.ReadAll(res.Body)
 	if err != nil {
-		slog.Error("Failed to read results of lat/long query", "error", err)
+		slog.Error("Failed to read results of lat/long query", "error", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	slog.Debug("Received response from geocode.arcgis.com", "response", response)
 	var results LocationResults
 	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Failed to unmarshal results of lat/log query", "error", err)
+		slog.Error("Failed to unmarshal results of lat/log query", "error", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	slog.Debug("Received results from geocode.arcgis.com", "results", results)
@@ -135,13 +135,13 @@ func GetWeather(latlong *LatLong, userAgent string, client *http.Client) (*goque
 	addHeaders(req, userAgent, false)
 	res, err := client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request for weather", "error", err)
+		slog.Error("Error sending request for weather", "error", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrWeatherParse)
 	}
 	defer res.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		slog.Error("Error parsing HTML", "error", err)
+		slog.Error("Error parsing HTML", "error", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrWeatherParse)
 	}
 	return doc, nil

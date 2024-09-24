@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -8,30 +10,52 @@ import (
 	"strings"
 )
 
-func ParseArgs() *Args {
+func ParseArgs() (*Args, error) {
 	userAgent := flag.String("u", "", "The user agent to use for requests")
-	zip := flag.String("zip", "", "The zip code to query for")
+	location := flag.String("zip", "", "The location to query for")
+	config := flag.String("c", "$XDG_CONFIG_HOME/weather/config.json", "Config file location")
 	flag.Parse()
+	var configFile Config
+	if *config != "" {
+		file, err := os.Open(os.ExpandEnv(*config))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to read config file %s\n", *config)
+			return nil, errors.New("unable to read file")
+		}
+		defer file.Close()
+		if err = json.NewDecoder(file).Decode(&configFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to parse config file %s: %s\n", *config, err)
+			return nil, errors.New("unable to parse file")
+		}
+	}
+	// User agents are from most specific to least specific
+	// i.e. specific to this run, to this program, to this user/system
+	// and then use a default if nothing else works
 	if *userAgent == "" {
-		*userAgent = os.Getenv("USER_AGENT")
+		if configFile.UserAgent != "" { // Check the config file
+			*userAgent = configFile.UserAgent
+		} else if os.Getenv("USER_AGENT") != "" { // Check the environment
+			*userAgent = os.Getenv("USER_AGENT")
+		} else { // Use a default
+			// Firefox 130 on Windows 10
+			*userAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
+		}
 	}
-	if *userAgent == "" { // No user agent was specified
-		// Default for Firefox 130
-		*userAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
-	}
-	if *zip == "" {
-		if len(flag.Args()) == 1 { // Use user agent from the environment
-			*zip = flag.Args()[0]
+	if *location == "" {
+		if len(flag.Args()) == 1 { // Check if there are any unprocessed arguments
+			*location = flag.Args()[0]
+		} else if configFile.Location != "" {
+			*location = configFile.Location
 		} else { // No user agent defined
 			fmt.Fprintf(os.Stderr, "Usage:\n")
 			flag.PrintDefaults()
-			os.Exit(1)
+			return nil, errors.New("no arguments")
 		}
 	}
 	return &Args{
 		*userAgent,
-		*zip,
-	}
+		*location,
+	}, nil
 }
 
 const Regular = 0
@@ -69,7 +93,7 @@ func CreatePrinter() Printer {
 
 // TODO: This does not seem like a good solution
 func makeFormat(f int, s string, i bool) string {
-	if f == 0 || !i { // Nothing to do here
+	if f == Regular || !i { // Nothing to do here
 		return s
 	}
 	builder := strings.Builder{}
