@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -159,9 +160,9 @@ func ParseWeather(doc *goquery.Document) (*Weather, error) {
 	// Get the short descriptions
 	shortForecast.Each(func(i int, s *goquery.Selection) {
 		weather.WeatherTimes[i] = WeatherTime{
-			s.Find(".period-name").First().Text(), // Name
-			s.Find(".temp").First().Text(),        // Temperature
-			s.Find(".short-desc").First().Text(),  // Short Description
+			strings.TrimSpace(s.Find(".period-name").First().Text()), // Name
+			strings.TrimSpace(s.Find(".temp").First().Text()),        // Temperature
+			strings.TrimSpace(s.Find(".short-desc").First().Text()),  // Short Description
 			"",                                    // Some of these have the long description as the image alt text, but some do not
 		}
 	})
@@ -173,7 +174,7 @@ func ParseWeather(doc *goquery.Document) (*Weather, error) {
 	advisories := doc.Find(".panel-danger .panel-body ul li")
 	weather.Advisories = make([]Advisory, advisories.Length())
 	advisories.Each(func(i int, s *goquery.Selection) {
-		weather.Advisories[i].Description = s.Text() // TODO: Needs for information than this
+		weather.Advisories[i].Description = strings.TrimSpace(s.Text()) // TODO: Needs for information than this
 	})
 	return &weather, nil
 }
