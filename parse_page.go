@@ -1,10 +1,8 @@
 package weather
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -38,88 +36,7 @@ func addHeaders(req *http.Request, userAgent string, isScript bool) {
 	}
 }
 
-func GetCity(location string, userAgent string, client *http.Client) (string, error) {
-	if client == nil {
-		client = &http.Client{}
-	}
-	params := url.Values{}
-	urlToSend, _ := url.Parse(cityurl)
-	params.Add("f", "json")
-	params.Add("maxSuggestions", "1")
-
-	params.Add("text", location)
-	params.Add("countryCode", "USA,PRI,VIR,GUM,ASM")
-	params.Add("category", "Land Features,Bay,Channel,Cove,Dam,Delta,Gulf,Lagoon,Lake,Ocean,Reef,Reservoir,Sea,Sound,Strait,Waterfall,Wharf,Amusement Park,Historical Monument,Landmark,Tourist Attraction,Zoo,College,Beach,Campground,Golf Course,Harbor,Nature Reserve,Other Parks and Outdoors,Park,Racetrack,Scenic Overlook,Ski Resort,Sports Center,Sports Field,Wildlife Reserve,Airport,Ferry,Marina,Pier,Port,Resort,Postal,Populated Place")
-	urlToSend.RawQuery = params.Encode()
-	req, _ := http.NewRequest("GET", urlToSend.String(), nil)
-	addHeaders(req, userAgent, true)
-	res, err := client.Do(req)
-	if err != nil {
-		slog.Error("Error sending request for city lookup", "error", errors.Unwrap(err))
-		return "", errors.Join(err, ErrInvalidCityResult)
-	}
-	defer res.Body.Close()
-	response, err := io.ReadAll(res.Body)
-	if err != nil {
-		slog.Error("Failed to read results of city lookup", "error", errors.Unwrap(err))
-		return "", errors.Join(err, ErrInvalidCityResult)
-	}
-	slog.Debug("Received response", "response", response)
-	var results SearchSuggestions
-	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Error decoding response of city lookup", "error", errors.Unwrap(err))
-		return "", errors.Join(err, ErrInvalidCityResult)
-	}
-	slog.Debug("Received results from geocode.arcgis.com", "results", results)
-	if len(results.Suggestions) != 1 {
-		slog.Error("Received an invalid number of results when fetching city name", "zip", location, "numResults", len(results.Suggestions))
-		return "", ErrInvalidCityResult
-	}
-	return results.Suggestions[0].Result, nil
-}
-
-// city should be the result of GetCity in the format "zip, city, state, country"
-// e.g. "53226, Milwaukee, WI, USA"
-func GetLatLong(city, userAgent string, client *http.Client) (*LatLong, error) {
-	if client == nil {
-		client = &http.Client{}
-	}
-	params := url.Values{}
-	params.Add("f", "json")
-	params.Add("text", city)
-	urlToSend, _ := url.Parse(latlongurl)
-	urlToSend.RawQuery = params.Encode()
-	req, _ := http.NewRequest("GET", urlToSend.String(), nil)
-	addHeaders(req, userAgent, true)
-	res, err := client.Do(req)
-	if err != nil {
-		slog.Error("Failed to get Lat/Long values", "error", errors.Unwrap(err))
-		return nil, errors.Join(err, ErrInvalidLatLongResult)
-	}
-	defer res.Body.Close()
-	response, err := io.ReadAll(res.Body)
-	if err != nil {
-		slog.Error("Failed to read results of lat/long query", "error", errors.Unwrap(err))
-		return nil, errors.Join(err, ErrInvalidLatLongResult)
-	}
-	slog.Debug("Received response from geocode.arcgis.com", "response", response)
-	var results LocationResults
-	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Failed to unmarshal results of lat/log query", "error", errors.Unwrap(err))
-		return nil, errors.Join(err, ErrInvalidLatLongResult)
-	}
-	slog.Debug("Received results from geocode.arcgis.com", "results", results)
-	if len(results.Locations) != 1 {
-		slog.Error("Received an invalid number of results when fetching lat/log", "city", city, "numResults", len(results.Locations))
-		return nil, errors.Join(err, ErrInvalidLatLongResult)
-	}
-	return &LatLong{
-		results.Locations[0].Extent.Ymin, // Latitude
-		results.Locations[0].Extent.Xmin, // Longitude
-	}, nil
-}
-
-func GetWeather(latlong *LatLong, userAgent string, client *http.Client) (*goquery.Document, error) {
+func downloadWeather(latlong *LatLong, queryUrl, userAgent string, client *http.Client) (*goquery.Document, error) {
 	if latlong == nil {
 		slog.Error("Attempted to call GetWeather with undefined latitude/longitude")
 		return nil, ErrInvalidParameter
@@ -130,7 +47,7 @@ func GetWeather(latlong *LatLong, userAgent string, client *http.Client) (*goque
 	params := url.Values{}
 	params.Add("lat", fmt.Sprint(latlong.Lat))
 	params.Add("lon", fmt.Sprint(latlong.Long))
-	sendUrl, _ := url.Parse(weatherurl)
+	sendUrl, _ := url.Parse(queryUrl)
 	sendUrl.RawQuery = params.Encode()
 	req, _ := http.NewRequest("GET", sendUrl.String(), nil)
 	addHeaders(req, userAgent, false)
@@ -148,7 +65,7 @@ func GetWeather(latlong *LatLong, userAgent string, client *http.Client) (*goque
 	return doc, nil
 }
 
-func ParseWeather(doc *goquery.Document) (*Weather, error) {
+func parseWeather(doc *goquery.Document) (*Weather, error) {
 	if doc == nil {
 		slog.Error("Attempted to call ParseWeather with undefined doc")
 		return nil, ErrInvalidParameter
@@ -163,7 +80,7 @@ func ParseWeather(doc *goquery.Document) (*Weather, error) {
 			strings.TrimSpace(s.Find(".period-name").First().Text()), // Name
 			strings.TrimSpace(s.Find(".temp").First().Text()),        // Temperature
 			strings.TrimSpace(s.Find(".short-desc").First().Text()),  // Short Description
-			"",                                    // Some of these have the long description as the image alt text, but some do not
+			"", // Some of these have the long description as the image alt text, but some do not
 		}
 	})
 	doc.Find("#detailed-forecast-body .row-forecast .forecast-text").Each(func(i int, s *goquery.Selection) {

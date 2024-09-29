@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 
 	weather "github.com/inventor500/go-weather"
@@ -30,26 +29,24 @@ func main() {
 }
 
 func mainFunc(printer Printer) int {
-	client := http.Client{}
-	res, err := weather.GetCity(args.Location, args.UserAgent, &client)
+	getter := weather.MakeWeatherGetter(args.UserAgent)
+	city, err := getter.GetCity(args.Location)
 	if err != nil {
 		return 1
 	}
-	latlong, err := weather.GetLatLong(res, args.UserAgent, &client)
+	latlong, err := getter.GetLatLong(city)
 	if err != nil {
 		return 1
 	}
-	doc, err := weather.GetWeather(latlong, args.UserAgent, &client)
+	w, err := getter.GetWeather(latlong)
 	if err != nil {
 		return 1
 	}
-	w, err := weather.ParseWeather(doc)
-	if err != nil || w == nil {
-		return 1
-	}
-	printer.Printf(Underline|Bold, "Weather Advisories\n")
-	for i := 0; i < len(w.Advisories); i++ {
-		printer.Printf(Red, "%s\n", w.Advisories[i].Description)
+	if len(w.Advisories) > 0 {
+		printer.Printf(Underline|Bold|Yellow, "Weather Advisories\n")
+		for i := 0; i < len(w.Advisories); i++ {
+			printer.Printf(Red, "%s\n", w.Advisories[i].Description)
+		}
 	}
 	printer.Printf(Underline|Bold, "Upcoming Weather Events\n")
 	for i := 0; i < len(w.WeatherTimes); i++ {
