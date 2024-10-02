@@ -10,44 +10,61 @@ import (
 	"strings"
 )
 
-func ParseArgs() (*Args, error) {
-	userAgent := flag.String("u", "", "The user agent to use for requests")
-	location := flag.String("zip", "", "The location to query for")
-	config := flag.String("c", "$XDG_CONFIG_HOME/weather/config.json", "Config file location")
-	flag.Parse()
+// The Freedesktop standard place for a config file
+const defaultConfigFile = "$XDG_CONFIG_HOME/weather/config.json"
+
+// Firefox 130 on Windows 10
+const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
+
+func readConfig(config string) (*Config, error) {
 	var configFile Config
-	if *config != "" {
-		file, err := os.Open(os.ExpandEnv(*config))
+	if config != "" {
+		file, err := os.Open(os.ExpandEnv(config))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to read config file %s\n", *config)
-			return nil, errors.New("unable to read file")
+			if config != defaultConfigFile {
+				fmt.Fprintf(os.Stderr, "Unable to read config file %s\n", config)
+				return nil, errors.New("unable to read file")
+			} else {
+				return nil, nil
+			}
 		}
 		defer file.Close()
 		if err = json.NewDecoder(file).Decode(&configFile); err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to parse config file %s: %s\n", *config, err)
+			fmt.Fprintf(os.Stderr, "Unable to parse config file %s: %s\n", config, err)
 			return nil, errors.New("unable to parse file")
 		}
+	}
+	return &configFile, nil
+}
+
+func ParseArgs() (*Args, error) {
+	userAgent := flag.String("u", "", "The user agent to use for requests")
+	location := flag.String("zip", "", "The location to query for")
+	config := flag.String("c", defaultConfigFile, "Config file location")
+	flag.Parse()
+	configFile, err := readConfig(*config)
+	if err != nil {
+		return nil, err
 	}
 	// User agents are from most specific to least specific
 	// i.e. specific to this run, to this program, to this user/system
 	// and then use a default if nothing else works
 	if *userAgent == "" {
-		if configFile.UserAgent != "" { // Check the config file
+		if configFile != nil && configFile.UserAgent != "" { // Check the config file
 			*userAgent = configFile.UserAgent
 		} else if os.Getenv("USER_AGENT") != "" { // Check the environment
 			*userAgent = os.Getenv("USER_AGENT")
 		} else { // Use a default
-			// Firefox 130 on Windows 10
-			*userAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
+			*userAgent = defaultUserAgent
 		}
 	}
 	if *location == "" {
 		if len(flag.Args()) == 1 { // Check if there are any unprocessed arguments
 			*location = flag.Args()[0]
-		} else if configFile.Location != "" {
+		} else if configFile != nil && configFile.Location != "" {
 			*location = configFile.Location
-		} else { // No user agent defined
-			fmt.Fprintf(os.Stderr, "Usage:\n")
+		} else { // No location defined
+			fmt.Fprintf(os.Stderr, "No location provided!\nUsage:\n")
 			flag.PrintDefaults()
 			return nil, errors.New("no arguments")
 		}

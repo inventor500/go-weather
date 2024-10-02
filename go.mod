@@ -1,6 +1,6 @@
 module github.com/inventor500/go-weather
 
-go 1.23.1
+go 1.23
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0 // indirect
