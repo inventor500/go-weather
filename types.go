@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 // Exported types
@@ -123,24 +124,24 @@ func (w *getWeatherData) GetCity(query string) (string, error) {
 	addHeaders(req, w.UserAgent, true)
 	res, err := w.Client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request for city lookup", "error", errors.Unwrap(err))
+		logError("Error sending request for city lookup: %s", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	defer res.Body.Close()
 	response, err := io.ReadAll(res.Body)
 	if err != nil {
-		slog.Error("Failed to read results of city lookup", "error", errors.Unwrap(err))
+		logError("Failed to read results of city lookup: %s", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	slog.Debug("Received response", "response", response)
 	var results searchSuggestions
 	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Error decoding response of city lookup", "error", errors.Unwrap(err))
+		logError("Error decoding response of city lookup: %s", errors.Unwrap(err))
 		return "", errors.Join(err, ErrInvalidCityResult)
 	}
 	slog.Debug("Received results from geocode.arcgis.com", "results", results)
 	if len(results.Suggestions) != 1 {
-		slog.Error("Received an invalid number of results when fetching city name", "zip", query, "numResults", len(results.Suggestions))
+		logError("Received %d results when fetching city name for %s", (results.Suggestions), query)
 		return "", ErrInvalidCityResult
 	}
 	return results.Suggestions[0].Result, nil
@@ -167,24 +168,24 @@ func (w *getWeatherData) GetLatLong(city string) (*LatLong, error) {
 	addHeaders(req, w.UserAgent, true)
 	res, err := w.Client.Do(req)
 	if err != nil {
-		slog.Error("Failed to get Lat/Long values", "error", errors.Unwrap(err))
+		logError("Failed to get Lat/Long values: %s", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	defer res.Body.Close()
 	response, err := io.ReadAll(res.Body)
 	if err != nil {
-		slog.Error("Failed to read results of lat/long query", "error", errors.Unwrap(err))
+		logError("Failed to read results of lat/long query: %s", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	slog.Debug("Received response from geocode.arcgis.com", "response", response)
 	var results locationResults
 	if err = json.Unmarshal(response, &results); err != nil {
-		slog.Error("Failed to unmarshal results of lat/log query", "error", errors.Unwrap(err))
+		logError("Failed to unmarshal results of lat/log query: %s", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	slog.Debug("Received results from geocode.arcgis.com", "results", results)
 	if len(results.Locations) != 1 {
-		slog.Error("Received an invalid number of results when fetching lat/log", "city", city, "numResults", len(results.Locations))
+		logError("Received %d results when fetching lat/log for %s", len(results.Locations), city)
 		return nil, errors.Join(err, ErrInvalidLatLongResult)
 	}
 	return &LatLong{
@@ -208,4 +209,10 @@ func (w *getWeatherData) GetWeather(LatLong *LatLong) (*Weather, error) {
 		return nil, err
 	}
 	return parseWeather(doc)
+}
+
+// Utility funcions
+
+func logError(msg string, args ...any) {
+	fmt.Fprintf(os.Stderr, msg+"\n", args...)
 }

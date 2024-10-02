@@ -13,8 +13,8 @@ import (
 // The Freedesktop standard place for a config file
 const defaultConfigFile = "$XDG_CONFIG_HOME/weather/config.json"
 
-// Firefox 130 on Windows 10
-const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0"
+// Firefox 130 on Android
+const defaultUserAgent = "Mozilla/5.0 (Android 15; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0"
 
 func readConfig(config string) (*Config, error) {
 	var configFile Config

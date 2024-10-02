@@ -3,7 +3,6 @@ package weather
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,7 +37,7 @@ func addHeaders(req *http.Request, userAgent string, isScript bool) {
 
 func downloadWeather(latlong *LatLong, queryUrl, userAgent string, client *http.Client) (*goquery.Document, error) {
 	if latlong == nil {
-		slog.Error("Attempted to call GetWeather with undefined latitude/longitude")
+		logError("Attempted to call GetWeather with undefined latitude/longitude")
 		return nil, ErrInvalidParameter
 	}
 	if client == nil {
@@ -53,13 +52,13 @@ func downloadWeather(latlong *LatLong, queryUrl, userAgent string, client *http.
 	addHeaders(req, userAgent, false)
 	res, err := client.Do(req)
 	if err != nil {
-		slog.Error("Error sending request for weather", "error", errors.Unwrap(err))
+		logError("Error sending request for weather: %s", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrWeatherParse)
 	}
 	defer res.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		slog.Error("Error parsing HTML", "error", errors.Unwrap(err))
+		logError("Error parsing HTML: %s", errors.Unwrap(err))
 		return nil, errors.Join(err, ErrWeatherParse)
 	}
 	return doc, nil
@@ -67,7 +66,7 @@ func downloadWeather(latlong *LatLong, queryUrl, userAgent string, client *http.
 
 func parseWeather(doc *goquery.Document) (*Weather, error) {
 	if doc == nil {
-		slog.Error("Attempted to call ParseWeather with undefined doc")
+		logError("Attempted to call ParseWeather with undefined doc")
 		return nil, ErrInvalidParameter
 	}
 	var weather Weather
