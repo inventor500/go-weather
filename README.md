@@ -7,6 +7,7 @@ Data is sourced from <https://forecast.weather.gov>.
 ## Useage
 
 ### Command Line Parameters
+
 | *Parameter* | *Description*                                                         |
 |-------------|-----------------------------------------------------------------------|
 | `-zip`      | The zip code the query for. This also accepts "city, state" locations |
@@ -25,9 +26,15 @@ The configuration file is located at `$XDG_CONFIG_HOME/weather/config.json` by d
 | `user-agent`       | User agent to use for queries |
 
 ### Environment Variables
+
 | *Variable*   | *Description*     |
 |--------------|-------------------|
 | `USER_AGENT` | User agent to use |
+
+## Compilation
+
+- `cd cmd/weather && go build`
+- Move the `weather` file to somewhere in your `PATH`
 
 ## Notes
 
