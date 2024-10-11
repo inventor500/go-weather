@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -14,6 +15,7 @@ import (
 const cityurl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/suggest"
 const latlongurl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find"
 const weatherurl = "https://forecast.weather.gov/MapClick.php"
+const alertBase = "https://forecast.weather.gov/" // This needs to be added to the weather alert URL
 
 var ErrInvalidCityResult = errors.New("invalid city result")
 var ErrInvalidLatLongResult = errors.New("invalid lat/long result")
@@ -64,6 +66,9 @@ func downloadWeather(latlong *LatLong, queryUrl, userAgent string, client *http.
 	return doc, nil
 }
 
+// Used for removing the "product" field from advisories URLs
+var productMatcher = regexp.MustCompile(`([&?])product[0-9]=[A-Za-z+0-9]+&`)
+
 func parseWeather(doc *goquery.Document) (*Weather, error) {
 	if doc == nil {
 		logError("Attempted to call ParseWeather with undefined doc")
@@ -88,9 +93,15 @@ func parseWeather(doc *goquery.Document) (*Weather, error) {
 		}
 	})
 	advisories := doc.Find(".panel-danger .panel-body ul li")
-	weather.Advisories = make([]Advisory, advisories.Length())
+	weather.Advisories.advisories = make([]advisory, advisories.Length())
 	advisories.Each(func(i int, s *goquery.Selection) {
-		weather.Advisories[i].Description = strings.TrimSpace(s.Text()) // TODO: Needs for information than this
+		weather.Advisories.advisories[i].Description = strings.TrimSpace(s.Text()) // TODO: Needs for information than this
 	})
+	url, exists := advisories.First().Find("a").First().Attr("href")
+	// Get rid of the unnecessary "product" stuff
+	url = productMatcher.ReplaceAllString(url, "$1")
+	if exists {
+		weather.Advisories.Url = alertBase + url
+	}
 	return &weather, nil
 }

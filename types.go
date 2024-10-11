@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // Exported types
@@ -22,12 +23,28 @@ type LatLong struct {
 // Weather result
 type Weather struct {
 	WeatherTimes []WeatherTime
-	Advisories   []Advisory
+	Advisories   Advisories
 }
 
 // Active advisories
-type Advisory struct {
-	Description string
+type Advisories struct {
+	advisories []advisory
+	Url        string // Advisories have a shared URL
+}
+
+func (a Advisories) String() string {
+	b := strings.Builder{}
+	for i := 0; i < len(a.advisories); i++ {
+		b.WriteString(a.advisories[i].Description)
+		if i < len(a.advisories)-1 {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+func (a Advisories) Length() int {
+	return len(a.advisories)
 }
 
 type WeatherTime struct {
@@ -59,6 +76,12 @@ func MakeWeatherGetter(userAgent string) WeatherGetter {
 }
 
 // Unexported types
+
+// Types for querying weather
+
+type advisory struct {
+	Description string
+}
 
 // Types for querying the city name
 

@@ -42,11 +42,10 @@ func mainFunc(printer Printer) int {
 	if err != nil {
 		return 1
 	}
-	if len(w.Advisories) > 0 {
+	if w.Advisories.Length() > 0 {
 		printer.Printf(Underline|Bold|Yellow, "Weather Advisories\n")
-		for i := 0; i < len(w.Advisories); i++ {
-			printer.Printf(Red, "%s\n", w.Advisories[i].Description)
-		}
+		printer.Printf(Red, "%s\n", w.Advisories)
+		printer.Printf(Underline|Yellow, w.Advisories.Url+"\n\n")
 	}
 	printer.Printf(Underline|Bold, "Upcoming Weather Events\n")
 	for i := 0; i < len(w.WeatherTimes); i++ {
